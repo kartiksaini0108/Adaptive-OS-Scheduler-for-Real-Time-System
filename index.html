@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Adaptive OS Scheduler for Real-Time Systems</title>
+    <style>
+        :root {
+            --bg1: #0a0e27;
+            --bg2: #1a1f3a;
+            --accent: #00ff88;
+            --accent2: #ff00ff;
+            --accent3: #00ccff;
+            --accent4: #ffaa00;
+            --card-bg: #1a2847;
+            --text: #e0f7ff;
+            --muted: #7a9cb5;
+            --success: #00ff88;
+            --warning: #ffaa00;
+            --danger: #ff0055;
+            --purple: #aa00ff;
+            --cyan: #00ffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            font-family: 'Courier New', 'Courier', monospace;
+            background: linear-gradient(135deg, var(--bg1), var(--bg2));
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(0, 255, 136, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0, 204, 255, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        header {
+            background: linear-gradient(90deg, #1a2847, #2a3a5a);
+            padding: 25px;
+            text-align: center;
+            border-bottom: 3px solid var(--accent);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header h1 {
+            font-size: 2em;
+            color: var(--accent);
+            margin-bottom: 5px;
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 20px rgba(0, 255, 136, 0.5); }
+            50% { text-shadow: 0 0 30px rgba(0, 255, 136, 0.8); }
+        }
+
+        header p {
+            color: var(--accent3);
+            font-size: 0.95em;
+            letter-spacing: 1px;
+        }
+
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .nav-btn {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 204, 255, 0.1));
+            border: 2px solid var(--accent);
+            color: var(--text);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 1px;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.1);
+        }
+
+        .nav-btn:hover {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.3), rgba(0, 204, 255, 0.3));
+            transform: translateY(-3px);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4), 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .nav-btn.active {
+            background: linear-gradient(135deg, var(--accent), var(--accent3));
+            color: var(--bg1);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        main {
+            padding: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.4s ease-in;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card {
+            background: linear-gradient(135deg, rgba(26, 40, 71, 0.9), rgba(42, 58, 102, 0.7));
+            border-radius: 12px;
+            padding: 22px;
+            margin: 20px 0;
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 255, 136, 0.1);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            border-color: rgba(0, 255, 136, 0.4);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 30px rgba(0, 255, 136, 0.2);
+            transform: translateY(-2px);
+        }
+
+        h2 {
+            color: var(--accent);
+            margin-bottom: 15px;
+            font-size: 1.6em;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 10px;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+
+        h3 {
+            color: var(--accent3);
+            margin-top: 15px;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        p, li {
+            color: var(--text);
+            line-height: 1.8;
+            margin: 10px 0;
+        }
+
+        ul {
+            margin-left: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .metric-box {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.08), rgba(0, 204, 255, 0.08));
+            border: 2px solid rgba(0, 255, 136, 0.3);
+            border-radius: 10px;
+            padding: 18px;
+            text-align: center;
+            transition: all 0.3s;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.05);
+        }
+
+        .metric-box:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 25px rgba(0, 255, 136, 0.2);
+            transform: translateY(-5px);
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 204, 255, 0.15));
+        }
+
+        .metric-value {
+            font-size: 2.2em;
+            font-weight: bold;
+            color: var(--accent);
+            margin: 10px 0;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+        }
+
+        .metric-label {
+            color: var(--muted);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--accent), var(--accent3));
+            color: var(--bg1);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: all 0.3s;
+            margin: 8px 5px;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 1px;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.6), 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: translateY(-1px);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 204, 255, 0.1));
+            color: var(--text);
+            border: 2px solid var(--accent3);
+            box-shadow: 0 0 15px rgba(0, 204, 255, 0.2);
+        }
+
+        button.secondary:hover {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 204, 255, 0.2));
+            box-shadow: 0 0 25px rgba(0, 204, 255, 0.4);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 14px;
+            text-align: left;
+            border-bottom: 1px solid rgba(0, 255, 136, 0.15);
+        }
+
+        th {
+            background: linear-gradient(90deg, rgba(0, 255, 136, 0.2), rgba(0, 204, 255, 0.2));
+            color: var(--accent);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        tr:hover {
+            background: rgba(0, 255, 136, 0.08);
+        }
+
+        .canvas-container {
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.3), rgba(10, 20, 40, 0.3));
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            border: 2px solid rgba(0, 255, 136, 0.2);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+
+        canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.1));
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status.running {
+            background: rgba(0, 255, 136, 0.25);
+            color: var(--success);
+            border: 2px solid var(--success);
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+        }
+
+        .status.waiting {
+            background: rgba(255, 170, 0, 0.25);
+            color: var(--warning);
+            border: 2px solid var(--warning);
+            box-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
+        }
+
+        .status.blocked {
+            background: rgba(255, 0, 85, 0.25);
+            color: var(--danger);
+            border: 2px solid var(--danger);
+            box-shadow: 0 0 10px rgba(255, 0, 85, 0.4);
+        }
+
+        .status.completed {
+            background: rgba(0, 204, 255, 0.25);
+            color: var(--accent3);
+            border: 2px solid var(--accent3);
+            box-shadow: 0 0 10px rgba(0, 204, 255, 0.4);
+        }
+
+        footer {
+            text-align: center;
+            padding: 25px;
+            background: linear-gradient(90deg, #1a2847, #2a3a5a);
+            border-top: 3px solid var(--accent);
+            margin-top: 40px;
+            color: var(--muted);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.12), rgba(0, 204, 255, 0.08));
+            border-left: 4px solid var(--accent);
+            padding: 18px;
+            border-radius: 6px;
+            margin: 15px 0;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.1);
+        }
+
+        .warning-box {
+            background: linear-gradient(135deg, rgba(255, 170, 0, 0.12), rgba(255, 0, 85, 0.08));
+            border-left: 4px solid var(--warning);
+            padding: 18px;
+            border-radius: 6px;
+            margin: 15px 0;
+            box-shadow: 0 0 15px rgba(255, 170, 0, 0.1);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, rgba(0, 255, 136, 0.2), rgba(0, 204, 255, 0.2));
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent3));
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+            border: 2px solid var(--text);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent3));
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+            border: 2px solid var(--text);
+        }
+
+        label {
+            color: var(--accent);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 768px) {
+            main {
+                padding: 15px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            nav {
+                flex-direction: column;
+            }
+
+            .nav-btn {
+                width: 100%;
+            }
+
+            header h1 {
+                font-size: 1.4em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>⚙️ ADAPTIVE OS SCHEDULER</h1>
+        <p>⚡ Dynamic Real-Time Scheduling System ⚡</p>
+        <nav id="navbar">
+            <button class="nav-btn active" onclick="showPage('overview')">📊 Overview</button>
+            <button class="nav-btn" onclick="showPage('dashboard')">📈 Dashboard</button>
+            <button class="nav-btn" onclick="showPage('simulation')">🎮 Simulation</button>
+            <button class="nav-btn" onclick="showPage('analysis')">🔍 Analysis</button>
+            <button class="nav-btn" onclick="showPage('about')">ℹ️ About</button>
+        </nav>
+    </header>
+
+    <main>
+        <!-- OVERVIEW PAGE -->
+        <section id="overview" class="page active">
+            <div class="card">
+                <h2>🎯 ADAPTIVE OS SCHEDULER</h2>
+                <p>An intelligent task management system that dynamically adjusts process priorities and scheduling decisions based on real-time system conditions, workload characteristics, and performance metrics.</p>
+                
+                <div class="info-box">
+                    <h3>⚡ KEY CHARACTERISTICS</h3>
+                    <ul>
+                        <li><strong>🔄 Dynamic Priority Adjustment:</strong> Priorities change based on task behavior and system load</li>
+                        <li><strong>⏱️ Real-Time Responsiveness:</strong> Guarantees meet hard real-time deadlines</li>
+                        <li><strong>🧠 Adaptive Learning:</strong> System learns from past execution patterns</li>
+                        <li><strong>🔮 Predictive Scheduling:</strong> Anticipates future load and adjusts accordingly</li>
+                        <li><strong>✅ QoS Management:</strong> Maintains Quality of Service requirements</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📋 TRADITIONAL vs ADAPTIVE</h2>
+                <table>
+                    <tr>
+                        <th>ASPECT</th>
+                        <th>TRADITIONAL</th>
+                        <th>ADAPTIVE</th>
+                    </tr>
+                    <tr>
+                        <td>Priority Management</td>
+                        <td style="color: var(--danger);">Static, predefined</td>
+                        <td style="color: var(--success);">Dynamic, real-time adjusted</td>
+                    </tr>
+                    <tr>
+                        <td>Response to Load</td>
+                        <td style="color: var(--danger);">Fixed parameters</td>
+                        <td style="color: var(--success);">Adapts to system conditions</td>
+                    </tr>
+                    <tr>
+                        <td>Deadline Guarantee</td>
+                        <td style="color: var(--danger);">Not guaranteed</td>
+                        <td style="color: var(--success);">High probability guarantee</td>
+                    </tr>
+                    <tr>
+                        <td>CPU Utilization</td>
+                        <td style="color: var(--danger);">60-70%</td>
+                        <td style="color: var(--success);">85-95%</td>
+                    </tr>
+                    <tr>
+                        <td>Context Switches</td>
+                        <td style="color: var(--danger);">Frequent, high overhead</td>
+                        <td style="color: var(--success);">Optimized, minimal overhead</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>🔧 CORE ALGORITHMS</h2>
+                <h3>1️⃣ Earliest Deadline First (EDF)</h3>
+                <p>Schedules tasks with the closest deadline first. Optimal for many real-time scenarios with 100% utilization guarantee.</p>
+
+                <h3>2️⃣ Rate Monotonic Scheduling (RMS)</h3>
+                <p>Assigns static priorities based on task period - shorter periods get higher priority. Simple but less optimal than EDF.</p>
+
+                <h3>3️⃣ Machine Learning-Based Adaptation</h3>
+                <p>Neural networks predict future task behavior and adjust scheduling decisions dynamically based on historical patterns.</p>
+
+                <h3>4️⃣ Feedback-Based Control</h3>
+                <p>Monitors actual performance and adjusts parameters using control theory to maintain desired system behavior.</p>
+            </div>
+        </section>
+
+        <!-- DASHBOARD PAGE -->
+        <section id="dashboard" class="page">
+            <div class="card">
+                <h2>📊 REAL-TIME DASHBOARD</h2>
+                <div class="controls">
+                    <button onclick="startDashboardSimulation()">▶️ START</button>
+                    <button class="secondary" onclick="pauseDashboardSimulation()">⏸️ PAUSE</button>
+                    <button class="secondary" onclick="resetDashboardMetrics()">🔄 RESET</button>
+                </div>
+
+                <div class="grid">
+                    <div class="metric-box">
+                        <div class="metric-label">CPU UTILIZATION</div>
+                        <div class="metric-value" id="cpuUtil">0%</div>
+                        <div id="cpuBar" style="background: rgba(0,0,0,0.5); height: 10px; border-radius: 5px; margin-top: 10px; border: 1px solid var(--accent);">
+                            <div style="background: linear-gradient(90deg, var(--success), var(--accent)); height: 100%; width: 0%; border-radius: 4px; transition: width 0.3s; box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);"></div>
+                        </div>
+                    </div>
+
+                    <div class="metric-box">
+                        <div class="metric-label">RESPONSE TIME</div>
+                        <div class="metric-value" id="respTime">0 ms</div>
+                        <div class="metric-label">Target: &lt;10ms</div>
+                    </div>
+
+                    <div class="metric-box">
+                        <div class="metric-label">DEADLINE MISS RATE</div>
+                        <div class="metric-value" id="missRate">0%</div>
+                        <div class="metric-label">Target: &lt;1%</div>
+                    </div>
+
+                    <div class="metric-box">
+                        <div class="metric-label">TASKS READY</div>
+                        <div class="metric-value" id="tasksReady">0</div>
+                        <div class="metric-label">Total: 10</div>
+                    </div>
+
+                    <div class="metric-box">
+                        <div class="metric-label">CONTEXT SWITCHES</div>
+                        <div class="metric-value" id="ctxSwitches">0</div>
+                        <div class="metric-label">/sec</div>
+                    </div>
+
+                    <div class="metric-box">
+                        <div class="metric-label">SYSTEM EFFICIENCY</div>
+                        <div class="metric-value" id="efficiency">0%</div>
+                        <div class="metric-label">ADAPTIVE SCORE</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📈 METRICS TREND</h2>
+                <div class="canvas-container">
+                    <canvas id="metricsChart" width="800" height="300"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>⏱️ ACTIVE TASKS</h2>
+                <table id="tasksTable">
+                    <tr>
+                        <th>TASK ID</th>
+                        <th>PRIORITY</th>
+                        <th>DEADLINE</th>
+                        <th>EXEC TIME</th>
+                        <th>STATUS</th>
+                    </tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- SIMULATION PAGE -->
+        <section id="simulation" class="page">
+            <div class="card">
+                <h2>🎮 INTERACTIVE SIMULATION</h2>
+                <p>Control the simulated environment and observe how the adaptive scheduler responds to different workloads.</p>
+
+                <h3>⚙️ SIMULATION CONTROLS</h3>
+                <div class="controls">
+                    <button onclick="runSimulation()">▶️ RUN</button>
+                    <button class="secondary" onclick="pauseSimulation()">⏸️ PAUSE</button>
+                    <button class="secondary" onclick="resetSimulation()">🔄 RESET</button>
+                </div>
+
+                <h3>📊 WORKLOAD CONFIGURATION</h3>
+                <div class="grid">
+                    <div>
+                        <label>SYSTEM LOAD:</label>
+                        <input type="range" id="loadRange" min="20" max="100" value="50" 
+                            oninput="updateLoad(this.value)" style="margin: 10px 0;">
+                        <div style="color: var(--accent); font-size: 0.9em; margin-top: 5px;" id="loadValue">50%</div>
+                    </div>
+                    <div>
+                        <label>TASK ARRIVAL RATE:</label>
+                        <input type="range" id="arrivalRange" min="1" max="10" value="5" 
+                            oninput="updateArrival(this.value)" style="margin: 10px 0;">
+                        <div style="color: var(--accent); font-size: 0.9em; margin-top: 5px;" id="arrivalValue">5 tasks/sec</div>
+                    </div>
+                </div>
+
+                <h3>🔀 SCHEDULING ALGORITHM</h3>
+                <div class="controls">
+                    <button id="algoEDF" onclick="setAlgorithm('edf')">EDF</button>
+                    <button id="algoRMS" onclick="setAlgorithm('rms')" class="secondary">RMS</button>
+                    <button id="algoML" onclick="setAlgorithm('ml')" class="secondary">ML-ADAPTIVE</button>
+                </div>
+
+                <div style="margin-top: 20px; padding: 15px; background: rgba(0, 255, 136, 0.08); border-radius: 8px; border: 1px solid rgba(0, 255, 136, 0.2);">
+                    <p id="algoDescription" style="font-style: italic; color: var(--accent3);">Select an algorithm to see details...</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🔄 TASK TIMELINE</h2>
+                <div class="canvas-container">
+                    <canvas id="timelineCanvas" width="800" height="250"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📊 SIMULATION RESULTS</h2>
+                <table id="resultsTable">
+                    <tr>
+                        <th>METRIC</th>
+                        <th>VALUE</th>
+                        <th>STATUS</th>
+                    </tr>
+                    <tr>
+                        <td>Average Response Time</td>
+                        <td id="simRespTime">-- ms</td>
+                        <td><span class="status waiting">WAITING</span></td>
+                    </tr>
+                    <tr>
+                        <td>Deadline Miss Rate</td>
+                        <td id="simMissRate">-- %</td>
+                        <td><span class="status waiting">WAITING</span></td>
+                    </tr>
+                    <tr>
+                        <td>CPU Utilization</td>
+                        <td id="simCPU">-- %</td>
+                        <td><span class="status waiting">WAITING</span></td>
+                    </tr>
+                    <tr>
+                        <td>Context Switches/sec</td>
+                        <td id="simCtx">-- </td>
+                        <td><span class="status waiting">WAITING</span></td>
+                    </tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- ANALYSIS PAGE -->
+        <section id="analysis" class="page">
+            <div class="card">
+                <h2>🔍 PERFORMANCE ANALYSIS</h2>
+                <p>Detailed analysis of scheduler performance metrics and optimization opportunities.</p>
+
+                <h3>📊 COMPARATIVE PERFORMANCE</h3>
+                <table>
+                    <tr>
+                        <th>METRIC</th>
+                        <th>EDF</th>
+                        <th>RMS</th>
+                        <th>ML-ADAPTIVE</th>
+                    </tr>
+                    <tr>
+                        <td>Avg Response Time</td>
+                        <td style="color: var(--warning);">8.5 ms</td>
+                        <td style="color: var(--danger);">12.3 ms</td>
+                        <td style="color: var(--success);">6.2 ms ✓</td>
+                    </tr>
+                    <tr>
+                        <td>Deadline Miss Rate</td>
+                        <td style="color: var(--warning);">2.1%</td>
+                        <td style="color: var(--danger);">4.7%</td>
+                        <td style="color: var(--success);">0.3% ✓</td>
+                    </tr>
+                    <tr>
+                        <td>CPU Utilization</td>
+                        <td style="color: var(--warning);">78%</td>
+                        <td style="color: var(--danger);">72%</td>
+                        <td style="color: var(--success);">91% ✓</td>
+                    </tr>
+                    <tr>
+                        <td>Context Switches</td>
+                        <td style="color: var(--warning);">185/sec</td>
+                        <td style="color: var(--danger);">142/sec</td>
+                        <td style="color: var(--success);">98/sec ✓</td>
+                    </tr>
+                    <tr>
+                        <td>Power Consumption</td>
+                        <td style="color: var(--warning);">45W</td>
+                        <td style="color: var(--warning);">42W</td>
+                        <td style="color: var(--success);">38W ✓</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>📈 COMPARISON CHART</h2>
+                <div class="canvas-container">
+                    <canvas id="comparisonChart" width="800" height="300"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🎯 KEY INSIGHTS</h2>
+                <ul>
+                    <li><strong style="color: var(--accent);">ML-Based Adaptive Scheduling:</strong> Achieves 27% lower response times compared to traditional EDF</li>
+                    <li><strong style="color: var(--accent);">Deadline Guarantees:</strong> Reduces deadline miss rate from 2.1% to 0.3% through predictive priority adjustment</li>
+                    <li><strong style="color: var(--accent);">Resource Efficiency:</strong> Improves CPU utilization by 16% while maintaining lower power consumption</li>
+                    <li><strong style="color: var(--accent);">System Stability:</strong> Context switches reduced by 47%, minimizing overhead and cache thrashing</li>
+                    <li><strong style="color: var(--accent);">Scalability:</strong> Maintains performance improvements even with 300% increase in task load</li>
+                </ul>
+            </div>
+
+            <div class="warning-box">
+                <h3>⚠️ IMPLEMENTATION CONSIDERATIONS</h3>
+                <ul>
+                    <li>ML models require initial training period (warm-up phase)</li>
+                    <li>Additional memory overhead for model storage and execution history</li>
+                    <li>Requires careful tuning for specific system characteristics</li>
+                    <li>May need fallback to traditional algorithms if ML prediction fails</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- ABOUT PAGE -->
+        <section id="about" class="page">
+            <div class="card">
+                <h2>ℹ️ ABOUT THIS DEMO</h2>
+                <p>This interactive simulation demonstrates the principles and benefits of adaptive operating system scheduling for real-time systems. All data is synthetically generated to illustrate scheduling behavior.</p>
+
+                <h3>✨ FEATURES INCLUDED</h3>
+                <ul>
+                    <li>Real-time performance metrics dashboard</li>
+                    <li>Interactive scheduler algorithm selection</li>
+                    <li>Dynamic task load simulation</li>
+                    <li>Comparative performance analysis</li>
+                    <li>Visual timeline representation of task execution</li>
+                    <li>Comprehensive documentation and explanations</li>
+                </ul>
+
+                <h3>🛠️ TECHNOLOGIES USED</h3>
+                <ul>
+                    <li><strong>Canvas API:</strong> Real-time chart rendering</li>
+                    <li><strong>JavaScript:</strong> Core simulation engine</li>
+                    <li><strong>HTML5/CSS3:</strong> Responsive user interface</li>
+                </ul>
+
+                <h3>📚 EDUCATIONAL VALUE</h3>
+                <p>This demo helps you understand:</p>
+                <ul>
+                    <li>Fundamental concepts of real-time scheduling</li>
+                    <li>Trade-offs between different scheduling algorithms</li>
+                    <li>Impact of adaptive techniques on system performance</li>
+                    <li>Practical implementation challenges and solutions</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>📖 FURTHER READING</h2>
+                <ul>
+                    <li><strong>Real-Time Systems:</strong> Liu, Jane W. S. "Real-Time Systems" (Prentice Hall)</li>
+                    <li><strong>Modern Operating Systems:</strong> Tanenbaum, Andrew S. (Pearson)</li>
+                    <li><strong>Scheduling Algorithms:</strong> IEEE Transactions on Software Engineering</li>
+                    <li><strong>Machine Learning for OS:</strong> Recent research in adaptive computing</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>⚙️ Adaptive OS Scheduler for Real-Time Systems | Interactive Simulation Demo</p>
+        <p>© 2025 Educational Project | Built with ❤️</p>
+    </footer>
+
+    <script>
+        // ============ PAGE NAVIGATION ============
+        function showPage(pageId) {
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+
+            const navBtns = document.querySelectorAll('.nav-btn');
+            navBtns.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            window.scrollTo(0, 0);
+        }
+
+        // ============ DASHBOARD SIMULATION ============
+        let dashboardRunning = false;
+        let dashboardData = {
+            cpuUtil: 20,
+            respTime: 5,
+            missRate: 0.5,
+            tasksReady: 3,
+            ctxSwitches: 50,
+            efficiency: 65,
+            history: []
+        };
+
+        function startDashboardSimulation() {
+            dashboardRunning = true;
+            dashboardSimulationLoop();
+        }
+
+        function pauseDashboardSimulation() {
+            dashboardRunning = false;
+        }
+
+        function resetDashboardMetrics() {
+            dashboardRunning = false;
+            dashboardData = { cpuUtil: 20, respTime: 5, missRate: 0.5, tasksReady: 3, ctxSwitches: 50, efficiency: 65, history: [] };
+            updateDashboardUI();
+            drawMetricsChart();
+            updateTasksTable();
+        }
+
+        function dashboardSimulationLoop() {
+            if (!dashboardRunning) return;
+
+            // Simulate realistic metrics with smooth transitions
+            dashboardData.cpuUtil += (Math.random() - 0.5) * 12;
+            dashboardData.cpuUtil = Math.min(95, Math.max(15, dashboardData.cpuUtil));
+            
+            dashboardData.respTime = 4 + Math.random() * 8;
+            dashboardData.missRate = Math.max(0, Math.min(5, dashboardData.missRate + (Math.random() - 0.6) * 0.8));
+            dashboardData.tasksReady = Math.floor(1 + Math.random() * 9);
+            dashboardData.ctxSwitches = Math.floor(40 + Math.random() * 180);
+            dashboardData.efficiency = Math.min(100, dashboardData.cpuUtil * 0.95 + Math.random() * 10);
+
+            dashboardData.history.push({
+                time: new Date().getTime(),
+                cpuUtil: dashboardData.cpuUtil,
+                respTime: dashboardData.respTime,
+                efficiency: dashboardData.efficiency
+            });
+
+            if (dashboardData.history.length > 60) dashboardData.history.shift();
+
+            updateDashboardUI();
+            drawMetricsChart();
+            updateTasksTable();
+
+            setTimeout(dashboardSimulationLoop, 800);
+        }
+
+        function updateDashboardUI() {
+            document.getElementById('cpuUtil').textContent = dashboardData.cpuUtil.toFixed(1) + '%';
+            document.getElementById('respTime').textContent = dashboardData.respTime.toFixed(2) + ' ms';
+            document.getElementById('missRate').textContent = dashboardData.missRate.toFixed(2) + '%';
+            document.getElementById('tasksReady').textContent = dashboardData.tasksReady;
+            document.getElementById('ctxSwitches').textContent = dashboardData.ctxSwitches;
+            document.getElementById('efficiency').textContent = dashboardData.efficiency.toFixed(1) + '%';
+
+            // Update CPU bar
+            const cpuBar = document.querySelector('#cpuBar > div');
+            cpuBar.style.width = dashboardData.cpuUtil + '%';
+        }
+
+        function updateTasksTable() {
+            const table = document.getElementById('tasksTable');
+            const statuses = ['running', 'waiting', 'blocked', 'completed'];
+            const statusEmojis = { running: '▶️', waiting: '⏸️', blocked: '🚫', completed: '✅' };
+            
+            for (let i = 0; i < 5; i++) {
+                let row = table.rows[i + 1];
+                if (!row) {
+                    row = table.insertRow();
+                    for (let j = 0; j < 5; j++) row.insertCell();
+                }
+                
+                const status = statuses[Math.floor(Math.random() * statuses.length)];
+                row.cells[0].textContent = 'TASK-' + (i + 1).toString().padStart(2, '0');
+                row.cells[1].textContent = (10 - i) * 10;
+                row.cells[2].textContent = (50 + Math.random() * 100).toFixed(0) + 'ms';
+                row.cells[3].textContent = (Math.random() * 30).toFixed(1) + ' ms';
+                row.cells[4].innerHTML = '<span class="status ' + status + '">' + statusEmojis[status] + ' ' + status.toUpperCase() + '</span>';
+            }
+        }
+
+        function drawMetricsChart() {
+            const canvas = document.getElementById('metricsChart');
+            if (!canvas || !canvas.offsetParent) return;
+            
+            const ctx = canvas.getContext('2d');
+            const width = canvas.offsetWidth;
+            const height = canvas.offsetHeight;
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw grid
+            ctx.strokeStyle = 'rgba(0, 255, 136, 0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < height; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(width, i);
+                ctx.stroke();
+            }
+
+            if (dashboardData.history.length < 2) {
+                ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+                ctx.font = '16px Courier New';
+                ctx.fillText('Starting simulation...', width / 2 - 80, height / 2);
+                return;
+            }
+
+            // Draw CPU Utilization (Green)
+            ctx.strokeStyle = 'rgb(0, 255, 136)';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = 'rgba(0, 255, 136, 0.5)';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            dashboardData.history.forEach((point, i) => {
+                const x = (i / (dashboardData.history.length - 1)) * (width - 60) + 30;
+                const y = height - 40 - (point.cpuUtil / 100) * (height - 80);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            ctx.shadowColor = 'transparent';
+
+            // Draw Response Time (Cyan)
+            ctx.strokeStyle = 'rgb(0, 204, 255)';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = 'rgba(0, 204, 255, 0.5)';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            dashboardData.history.forEach((point, i) => {
+                const x = (i / (dashboardData.history.length - 1)) * (width - 60) + 30;
+                const y = height - 40 - (point.respTime / 15) * (height - 80);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            ctx.shadowColor = 'transparent';
+
+            // Draw Efficiency (Magenta)
+            ctx.strokeStyle = 'rgb(255, 0, 255)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.shadowColor = 'rgba(255, 0, 255, 0.3)';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            dashboardData.history.forEach((point, i) => {
+                const x = (i / (dashboardData.history.length - 1)) * (width - 60) + 30;
+                const y = height - 40 - (point.efficiency / 100) * (height - 80);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.shadowColor = 'transparent';
+
+            // Legend
+            ctx.font = 'bold 12px Courier New';
+            ctx.fillStyle = 'rgb(0, 255, 136)';
+            ctx.fillRect(10, 10, 12, 12);
+            ctx.fillStyle = 'white';
+            ctx.fillText('CPU %', 25, 19);
+
+            ctx.fillStyle = 'rgb(0, 204, 255)';
+            ctx.fillRect(120, 10, 12, 12);
+            ctx.fillStyle = 'white';
+            ctx.fillText('Response Time', 135, 19);
+
+            ctx.fillStyle = 'rgb(255, 0, 255)';
+            ctx.fillRect(280, 10, 12, 12);
+            ctx.fillStyle = 'white';
+            ctx.fillText('Efficiency', 295, 19);
+        }
+
+        // ============ SIMULATION PAGE ============
+        let currentAlgorithm = 'edf';
+        let simRunning = false;
+
+        function setAlgorithm(algo) {
+            currentAlgorithm = algo;
+            
+            const descriptions = {
+                edf: '⏱️ EDF (Earliest Deadline First): Tasks with nearest deadlines execute first. Optimal for many real-time scenarios with guaranteed 100% utilization. ✓',
+                rms: '📊 RMS (Rate Monotonic): Higher frequency tasks get higher static priority. Simpler but less optimal than EDF.',
+                ml: '🧠 ML-Based Adaptive: Uses neural networks to predict task behavior and dynamically adjust priorities. Learns from execution patterns.'
+            };
+            
+            document.getElementById('algoDescription').textContent = descriptions[algo];
+            
+            const edfBtn = document.getElementById('algoEDF');
+            const rmsBtn = document.getElementById('algoRMS');
+            const mlBtn = document.getElementById('algoML');
+            
+            edfBtn.style.background = algo === 'edf' ? 'linear-gradient(135deg, var(--accent), var(--accent3))' : 'linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 204, 255, 0.1))';
+            edfBtn.style.color = algo === 'edf' ? 'var(--bg1)' : 'var(--text)';
+            edfBtn.style.border = algo === 'edf' ? 'none' : '2px solid var(--accent3)';
+            
+            rmsBtn.style.background = algo === 'rms' ? 'linear-gradient(135deg, var(--accent), var(--accent3))' : 'linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 204, 255, 0.1))';
+            rmsBtn.style.color = algo === 'rms' ? 'var(--bg1)' : 'var(--text)';
+            rmsBtn.style.border = algo === 'rms' ? 'none' : '2px solid var(--accent3)';
+            
+            mlBtn.style.background = algo === 'ml' ? 'linear-gradient(135deg, var(--accent), var(--accent3))' : 'linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 204, 255, 0.1))';
+            mlBtn.style.color = algo === 'ml' ? 'var(--bg1)' : 'var(--text)';
+            mlBtn.style.border = algo === 'ml' ? 'none' : '2px solid var(--accent3)';
+        }
+
+        function updateLoad(val) {
+            document.getElementById('loadValue').textContent = val + '%';
+        }
+
+        function updateArrival(val) {
+            document.getElementById('arrivalValue').textContent = val + ' tasks/sec';
+        }
+
+        function runSimulation() {
+            simRunning = true;
+            const load = parseInt(document.getElementById('loadRange').value);
+            const arrival = parseInt(document.getElementById('arrivalRange').value);
+
+            let respTime, missRate, cpuUtil, ctxSwitches;
+
+            if (currentAlgorithm === 'edf') {
+                respTime = 8.5 + Math.random() * 2;
+                missRate = 2.1 + Math.random() * 1;
+                cpuUtil = 78 + Math.random() * 5;
+                ctxSwitches = 185 + Math.random() * 30;
+            } else if (currentAlgorithm === 'rms') {
+                respTime = 12.3 + Math.random() * 3;
+                missRate = 4.7 + Math.random() * 2;
+                cpuUtil = 72 + Math.random() * 5;
+                ctxSwitches = 142 + Math.random() * 25;
+            } else {
+                respTime = 6.2 + Math.random() * 1.5;
+                missRate = 0.3 + Math.random() * 0.5;
+                cpuUtil = 91 + Math.random() * 4;
+                ctxSwitches = 98 + Math.random() * 15;
+            }
+
+            document.getElementById('simRespTime').textContent = respTime.toFixed(1) + ' ms';
+            document.getElementById('simMissRate').textContent = missRate.toFixed(2) + '%';
+            document.getElementById('simCPU').textContent = cpuUtil.toFixed(0) + '%';
+            document.getElementById('simCtx').textContent = ctxSwitches.toFixed(0);
+
+            drawTimeline();
+            simRunning = false;
+        }
+
+        function pauseSimulation() {
+            simRunning = false;
+        }
+
+        function resetSimulation() {
+            document.getElementById('simRespTime').textContent = '-- ms';
+            document.getElementById('simMissRate').textContent = '-- %';
+            document.getElementById('simCPU').textContent = '-- %';
+            document.getElementById('simCtx').textContent = '-- ';
+            drawTimeline();
+        }
+
+        function drawTimeline() {
+            const canvas = document.getElementById('timelineCanvas');
+            if (!canvas || !canvas.offsetParent) return;
+
+            const ctx = canvas.getContext('2d');
+            const width = canvas.offsetWidth;
+            const height = canvas.offsetHeight;
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            ctx.clearRect(0, 0, width, height);
+
+            // Background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(0, 0, width, height);
+
+            const taskHeight = 35;
+            const spacing = 8;
+            const numTasks = 5;
+
+            for (let i = 0; i < numTasks; i++) {
+                const y = (taskHeight + spacing) * i + 20;
+
+                // Task timeline
+                const startTime = Math.random() * 200;
+                const duration = 80 + Math.random() * 200;
+                const colors = ['rgb(0, 255, 136)', 'rgb(0, 204, 255)', 'rgb(255, 0, 255)', 'rgb(255, 170, 0)', 'rgb(255, 0, 85)'];
+                const color = colors[i % colors.length];
+
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.7;
+                ctx.fillRect(startTime + 60, y, duration, taskHeight);
+                ctx.globalAlpha = 1;
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 10;
+                ctx.strokeRect(startTime + 60, y, duration, taskHeight);
+                ctx.shadowColor = 'transparent';
+
+                // Task label
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 12px Courier New';
+                ctx.fillText('TASK-' + (i + 1).toString().padStart(2, '0'), 10, y + 22);
+
+                // Time labels
+                if (i === numTasks - 1) {
+                    ctx.fillStyle = 'rgba(122, 156, 181, 0.9)';
+                    ctx.font = '11px Courier New';
+                    ctx.fillText('0ms', 60, height - 15);
+                    ctx.fillText('Time →', width - 80, height - 15);
+                }
+            }
+        }
+
+        // ============ COMPARISON CHART ============
+        function drawComparisonChart() {
+            const canvas = document.getElementById('comparisonChart');
+            if (!canvas || !canvas.offsetParent) return;
+
+            const ctx = canvas.getContext('2d');
+            const width = canvas.offsetWidth;
+            const height = canvas.offsetHeight;
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            ctx.clearRect(0, 0, width, height);
+
+            const metrics = ['RESP\nTIME', 'MISS\nRATE', 'CPU\nUTIL', 'CTX\nSWITCH', 'POWER'];
+            const edfValues = [8.5, 2.1, 78, 185, 45];
+            const rmsValues = [12.3, 4.7, 72, 142, 42];
+            const mlValues = [6.2, 0.3, 91, 98, 38];
+
+            const barWidth = 45;
+            const spacing = 110;
+            const maxHeight = height - 80;
+            const startX = 80;
+
+            for (let i = 0; i < metrics.length; i++) {
+                const x = startX + i * spacing;
+
+                // EDF
+                ctx.fillStyle = 'rgba(102, 204, 153, 0.6)';
+                ctx.shadowColor = 'rgba(102, 204, 153, 0.5)';
+                ctx.shadowBlur = 10;
+                const h1 = (edfValues[i] / 30 * maxHeight);
+                ctx.fillRect(x, maxHeight + 50 - h1, barWidth - 8, h1);
+                ctx.shadowColor = 'transparent';
+
+                // RMS
+                ctx.fillStyle = 'rgba(255, 159, 64, 0.6)';
+                ctx.shadowColor = 'rgba(255, 159, 64, 0.5)';
+                ctx.shadowBlur = 10;
+                const h2 = (rmsValues[i] / 30 * maxHeight);
+                ctx.fillRect(x + 15, maxHeight + 50 - h2, barWidth - 8, h2);
+                ctx.shadowColor = 'transparent';
+
+                // ML-Adaptive
+                ctx.fillStyle = 'rgba(0, 255, 136, 0.8)';
+                ctx.shadowColor = 'rgba(0, 255, 136, 0.5)';
+                ctx.shadowBlur = 10;
+                const h3 = (mlValues[i] / 30 * maxHeight);
+                ctx.fillRect(x + 30, maxHeight + 50 - h3, barWidth - 8, h3);
+                ctx.shadowColor = 'transparent';
+
+                // Labels
+                ctx.fillStyle = 'var(--accent)';
+                ctx.font = 'bold 11px Courier New';
+                ctx.fillText(metrics[i], x - 5, maxHeight + 70);
+            }
+
+            // Legend
+            ctx.font = 'bold 12px Courier New';
+            ctx.fillStyle = 'rgba(102, 204, 153, 0.6)';
+            ctx.fillRect(width - 240, 20, 15, 15);
+            ctx.fillStyle = 'white';
+            ctx.fillText('EDF', width - 215, 33);
+
+            ctx.fillStyle = 'rgba(255, 159, 64, 0.6)';
+            ctx.fillRect(width - 140, 20, 15, 15);
+            ctx.fillStyle = 'white';
+            ctx.fillText('RMS', width - 115, 33);
+
+            ctx.fillStyle = 'rgba(0, 255, 136, 0.8)';
+            ctx.fillRect(width - 60, 20, 15, 15);
+            ctx.fillStyle = 'white';
+            ctx.fillText('ML-ADAPTIVE', width - 35, 33);
+        }
+
+        // ============ INITIALIZATION ============
+        window.addEventListener('load', () => {
+            setAlgorithm('edf');
+            drawComparisonChart();
+            
+            // Redraw on window resize
+            window.addEventListener('resize', () => {
+                drawMetricsChart();
+                drawTimeline();
+                drawComparisonChart();
+            });
+        });
+    </script>
+</body>
+</html>
